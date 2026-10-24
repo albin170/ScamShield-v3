@@ -1,7 +1,7 @@
 services:
   # ── ScamShield Backend API ───────────────────────────────────────────
   - type: web
-    name: scamshield-v2
+    name: scamshield-v3
     runtime: python
     rootDir: scamshield-backend
     buildCommand: pip install -r requirements.txt
@@ -26,7 +26,7 @@ services:
 
   # ── ScamShield Frontend (Render Static Site Blueprint) ───────────────
   - type: web
-    name: scamshield-frontend
+    name: scamshield-v3-frontend
     runtime: static
     rootDir: scamshield-frontend
     buildCommand: npm install && npm run build
@@ -40,5 +40,5 @@ services:
       - key: VITE_API_URL
         fromService:
           type: web
-          name: scamshield-v2
+          name: scamshield-v3
           property: host
