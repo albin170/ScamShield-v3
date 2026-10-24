@@ -31,7 +31,6 @@ services:
     rootDir: scamshield-frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
-    plan: free
     routes:
       - type: rewrite
         source: /*
