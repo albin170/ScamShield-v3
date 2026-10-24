@@ -16,9 +16,9 @@ services:
       - key: CORS_ORIGINS
         value: "http://localhost:5173,http://localhost:3000,https://*.vercel.app"
       - key: SUPERADMIN_USERNAME
-        value: albin
+        value: admin
       - key: SUPERADMIN_INITIAL_PASSWORD
-        generateValue: true
+        value: Admin@123
       - key: TOKEN_EXPIRE_MINUTES
         value: "480"
       - key: MAX_UPLOAD_SIZE_MB

@@ -197,67 +197,58 @@ def _seed_default_settings(conn):
 # ---------------------------------------------------------------------------
 def bootstrap_superadmin():
     """
-    Create the super admin account if it doesn't already exist.
-    Reads credentials from environment variables — never from code.
-
-    Environment variables:
-        SUPERADMIN_USERNAME  (default: albin)
-        SUPERADMIN_INITIAL_PASSWORD  (REQUIRED — no default for security)
+    Create or synchronize the super admin account(s).
+    Supports both custom SUPERADMIN_USERNAME and fallback 'admin'.
+    Always ensures the password matches SUPERADMIN_INITIAL_PASSWORD or 'Admin@123'.
     """
-    username = os.getenv("SUPERADMIN_USERNAME", "albin")
-    initial_password = os.getenv("SUPERADMIN_INITIAL_PASSWORD")
-
-    if not initial_password:
-        print(
-            "[ScamShield] SUPERADMIN_INITIAL_PASSWORD not set. "
-            "Super admin account will not be created. "
-            "Set this env var and restart to bootstrap."
-        )
-        return
+    username = os.getenv("SUPERADMIN_USERNAME", "admin")
+    initial_password = os.getenv("SUPERADMIN_INITIAL_PASSWORD", "Admin@123")
 
     with get_db() as conn:
-        existing = conn.execute(
-            "SELECT id FROM users WHERE username = ? AND role = ?",
-            (username, ROLE_SUPERADMIN),
-        ).fetchone()
+        targets = list(dict.fromkeys([username, "admin", "albin"]))
+        for uname in targets:
+            existing = conn.execute(
+                "SELECT id FROM users WHERE username = ?",
+                (uname,),
+            ).fetchone()
 
-        if existing:
-            print(f"[ScamShield] Super admin '{username}' already exists. Skipping bootstrap.")
-            return
-
-        import uuid
-        user_id = str(uuid.uuid4())
-        now = now_iso()
-
-        conn.execute(
-            """INSERT INTO users
-               (id, username, role, password_hash, permissions, is_active, must_change_password, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?)""",
-            (
-                user_id,
-                username,
-                ROLE_SUPERADMIN,
-                hash_password(initial_password),
-                json.dumps(ALL_PERMISSIONS),
-                now,
-                now,
-            ),
-        )
-
-        conn.execute(
-            """INSERT INTO audit_log (id, actor_id, actor_username, action, target_type, target_id, outcome, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                str(uuid.uuid4()),
-                user_id,
-                username,
-                "superadmin_bootstrap",
-                "user",
-                user_id,
-                "success",
-                now,
-            ),
-        )
-
+            if existing:
+                conn.execute(
+                    "UPDATE users SET password_hash = ?, failed_login_count = 0, is_active = 1, is_suspended = 0, must_change_password = 0 WHERE id = ?",
+                    (hash_password(initial_password), existing["id"]),
+                )
+                print(f"[ScamShield] Super admin '{uname}' credentials synchronized.")
+            else:
+                import uuid
+                user_id = str(uuid.uuid4())
+                now = now_iso()
+                conn.execute(
+                    """INSERT INTO users
+                       (id, username, role, password_hash, permissions, is_active, must_change_password, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, 1, 0, ?, ?)""",
+                    (
+                        user_id,
+                        uname,
+                        ROLE_SUPERADMIN,
+                        hash_password(initial_password),
+                        json.dumps(ALL_PERMISSIONS),
+                        now,
+                        now,
+                    ),
+                )
+                conn.execute(
+                    """INSERT INTO audit_log (id, actor_id, actor_username, action, target_type, target_id, outcome, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        str(uuid.uuid4()),
+                        user_id,
+                        uname,
+                        "superadmin_bootstrap",
+                        "user",
+                        user_id,
+                        "success",
+                        now,
+                    ),
+                )
+                print(f"[ScamShield] Super admin '{uname}' created.")
         conn.commit()
-        print(f"[ScamShield] Super admin '{username}' created. Password change required on first login.")
